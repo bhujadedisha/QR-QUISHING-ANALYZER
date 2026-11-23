@@ -2,6 +2,66 @@
 import streamlit as st
 import cv2
 import numpy as np
+from urllib.parse import urlparse
+import re
+
+st.set_page_config(page_title="QR Quishing Analyzer")
+
+st.title("QR Quishing Analyzer")
+st.write("Detect suspicious URLs hidden inside QR codes.")
+
+uploaded_file = st.file_uploader(
+    "Upload a QR Code Image",
+    type=["png", "jpg", "jpeg"]
+)
+
+def analyze_url(url):
+    parsed = urlparse(url)
+    risks = []
+
+    if parsed.scheme != "https":
+        risks.append("Website does not use HTTPS")
+
+    if "@" in url:
+        risks.append("URL contains @ symbol")
+
+    if re.search(r"\d+\.\d+\.\d+\.\d+", parsed.netloc):
+        risks.append("URL uses an IP address")
+
+    if len(url) > 100:
+        risks.append("Unusually long URL")
+
+    if any(word in url.lower() for word in
+           ["login", "verify", "password", "account"]):
+        risks.append("Contains suspicious keywords")
+
+    return risks
+
+if uploaded_file:
+    image = np.frombuffer(uploaded_file.read(), np.uint8)
+    img = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+    detector = cv2.QRCodeDetector()
+    url, points, _ = detector.detectAndDecode(img)
+
+    if url:
+        st.success("QR Code detected!")
+        st.write("Extracted URL:", url)
+
+        risks = analyze_url(url)
+
+        if risks:
+            st.warning("Potential security risks found:")
+            for risk in risks:
+                st.write("- " + risk)
+        else:
+            st.info("No listed warning signs detected.")
+    else:
+        st.error("No readable QR code found.")
+
+import streamlit as st
+import cv2
+import numpy as np
 from PIL import Image, ImageOps
 import urllib.parse
 import ipaddress
